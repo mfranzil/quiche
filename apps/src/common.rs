@@ -263,6 +263,29 @@ pub fn generate_cid_and_reset_token<T: SecureRandom>(
     (scid, reset_token)
 }
 
+/// Construct a priority field value from quiche apps custom query string.
+pub fn priority_field_value_from_query_string(url: &url::Url) -> Option<String> {
+    let mut priority = "".to_string();
+    for param in url.query_pairs() {
+        if param.0 == "u" {
+            priority.push_str(&format!("{}={},", param.0, param.1));
+        }
+
+        if param.0 == "i" && param.1 == "1" {
+            priority.push_str("i,");
+        }
+    }
+
+    if !priority.is_empty() {
+        // remove trailing comma
+        priority.pop();
+
+        Some(priority)
+    } else {
+        None
+    }
+}
+
 pub trait HttpConn {
     fn send_requests(
         &mut self, conn: &mut quiche::Connection, target_path: &Option<String>,
@@ -458,6 +481,7 @@ struct Http3Request {
     cardinal: u64,
     stream_id: Option<u64>,
     hdrs: Vec<quiche::h3::Header>,
+    priority: Option<String>,
     response_hdrs: Vec<quiche::h3::Header>,
     response_body: Vec<u8>,
     response_body_max: usize,
@@ -465,7 +489,7 @@ struct Http3Request {
 }
 
 type Http3ResponseBuilderResult = std::result::Result<
-    (Vec<quiche::h3::Header>, Vec<u8>, quiche::h3::Priority),
+    (Vec<quiche::h3::Header>, Vec<u8>, Vec<u8>),
     (u64, String),
 >;
 
@@ -824,7 +848,8 @@ impl Http3Conn {
     pub fn with_urls(
         conn: &mut quiche::Connection, urls: &[url::Url], reqs_cardinal: u64,
         req_headers: &[String], body: &Option<Vec<u8>>, method: &str,
-        dump_json: Option<usize>, dgram_sender: Option<Http3DgramSender>,
+        send_priority_update: bool, dump_json: Option<usize>,
+        dgram_sender: Option<Http3DgramSender>,
         output_sink: Rc<RefCell<dyn FnMut(String)>>,
     ) -> Box<dyn HttpConn> {
         let mut reqs = Vec::new();
@@ -846,6 +871,12 @@ impl Http3Conn {
                     ),
                     quiche::h3::Header::new(b"user-agent", b"quiche"),
                 ];
+
+                let priority = if send_priority_update {
+                    priority_field_value_from_query_string(url)
+                } else {
+                    None
+                };
 
                 // Add custom headers to the request.
                 for header in req_headers {
@@ -873,6 +904,7 @@ impl Http3Conn {
                     url: url.clone(),
                     cardinal: i,
                     hdrs,
+                    priority,
                     response_hdrs: Vec::new(),
                     response_body: Vec::new(),
                     response_body_max: dump_json.unwrap_or_default(),
@@ -1108,21 +1140,10 @@ impl Http3Conn {
 
         // Priority query string takes precedence over the header.
         // So replace the header with one built here.
-        let mut query_priority = "".to_string();
-        for param in url.query_pairs() {
-            if param.0 == "u" {
-                query_priority.push_str(&format!("{}={},", param.0, param.1));
-            }
+        let query_priority = priority_field_value_from_query_string(&url);
 
-            if param.0 == "i" && param.1 == "1" {
-                query_priority.push_str("i,");
-            }
-        }
-
-        if !query_priority.is_empty() {
-            // remove trailing comma
-            query_priority.pop();
-            priority = query_priority.as_bytes().to_vec();
+        if let Some(p) = query_priority {
+            priority = p.as_bytes().to_vec();
         }
 
         let (status, body) = match decided_method {
@@ -1143,7 +1164,7 @@ impl Http3Conn {
             _ => (405, Vec::new()),
         };
 
-        let mut headers = vec![
+        let headers = vec![
             quiche::h3::Header::new(b":status", status.to_string().as_bytes()),
             quiche::h3::Header::new(b"server", b"quiche"),
             quiche::h3::Header::new(
@@ -1151,20 +1172,6 @@ impl Http3Conn {
                 body.len().to_string().as_bytes(),
             ),
         ];
-
-        if !priority.is_empty() {
-            headers
-                .push(quiche::h3::Header::new(b"priority", priority.as_slice()));
-        }
-
-        #[cfg(feature = "sfv")]
-        let priority = match quiche::h3::Priority::try_from(priority.as_slice()) {
-            Ok(v) => v,
-            Err(_) => quiche::h3::Priority::default(),
-        };
-
-        #[cfg(not(feature = "sfv"))]
-        let priority = quiche::h3::Priority::default();
 
         Ok((headers, body, priority))
     }
@@ -1204,6 +1211,35 @@ impl HttpConn for Http3Conn {
             };
 
             debug!("Sent HTTP request {:?}", hdrs_to_strings(&req.hdrs));
+
+            if let Some(priority_field_value) = &req.priority {
+                // quiche doesn't let us do this via an API, so we just have
+                // to write the bytes directly into the control stream, which
+                // isn't ideal.
+                const PRIORITY_UPDATE_FRAME_REQUEST_TYPE_ID: u64 = 0xF0700;
+                let prioritized_element_id = s;
+
+                let mut d = [42; 16];
+
+                let mut b = octets::OctetsMut::with_slice(&mut d);
+
+                let len = octets::varint_len(prioritized_element_id) +
+                    priority_field_value.len();
+
+                b.put_varint(PRIORITY_UPDATE_FRAME_REQUEST_TYPE_ID).unwrap();
+                b.put_varint(len as u64).unwrap();
+
+                b.put_varint(prioritized_element_id).unwrap();
+                b.put_bytes(priority_field_value.as_bytes()).unwrap();
+
+                let frame_len = b.off();
+
+                if let Ok(true) = conn.stream_writable(0, frame_len) {
+                    // assume control stream always has ID 2.
+                    // if it fails to send, give up
+                    conn.stream_send(2, &d[..frame_len], false).ok();
+                }
+            }
 
             req.stream_id = Some(s);
             req.response_writer =
@@ -1473,7 +1509,7 @@ impl HttpConn for Http3Conn {
                     conn.stream_shutdown(stream_id, quiche::Shutdown::Read, 0)
                         .unwrap();
 
-                    let (headers, body, priority) =
+                    let (mut headers, body, mut priority) =
                         match Http3Conn::build_h3_response(root, index, &list) {
                             Ok(v) => v,
 
@@ -1488,9 +1524,43 @@ impl HttpConn for Http3Conn {
                             },
                         };
 
-                    debug!(
-                        "Prioritizing request on stream {} as {:?}",
-                        stream_id, priority
+                    match self.h3_conn.take_last_priority_update(stream_id) {
+                        Ok(v) => {
+                            priority = v;
+                        },
+
+                        Err(quiche::h3::Error::Done) => (),
+
+                        Err(e) => error!(
+                            "{} error taking PRIORITY_UPDATE {}",
+                            conn.trace_id(),
+                            e
+                        ),
+                    }
+
+                    if !priority.is_empty() {
+                        headers.push(quiche::h3::Header::new(
+                            b"priority",
+                            priority.as_slice(),
+                        ));
+                    }
+
+                    #[cfg(feature = "sfv")]
+                    let priority =
+                        match quiche::h3::Priority::try_from(priority.as_slice())
+                        {
+                            Ok(v) => v,
+                            Err(_) => quiche::h3::Priority::default(),
+                        };
+
+                    #[cfg(not(feature = "sfv"))]
+                    let priority = quiche::h3::Priority::default();
+
+                    info!(
+                        "{} prioritizing request on stream {} as {:?}",
+                        conn.trace_id(),
+                        stream_id,
+                        priority
                     );
 
                     match self.h3_conn.send_response_with_priority(
