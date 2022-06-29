@@ -43,7 +43,7 @@
 
 #include <quiche.h>
 
-#define LOCAL_CONN_ID_LEN 16
+#define LOCAL_CONN_ID_LEN 20
 
 #define MAX_DATAGRAM_SIZE 1350
 

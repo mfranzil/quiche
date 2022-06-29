@@ -542,9 +542,9 @@ pub fn decrypt_hdr(
     let mask = aead.new_mask(sample.as_ref())?;
 
     if Header::is_long(first) {
-        first ^= mask[0] & 0x0f;
+        // first ^= mask[0] & 0x0f;
     } else {
-        first ^= mask[0] & 0x1f;
+        // first ^= mask[0] & 0x1f;
     }
 
     let pn_len = usize::from((first & PKT_NUM_MASK) + 1);
@@ -552,7 +552,7 @@ pub fn decrypt_hdr(
     let ciphertext = &mut ciphertext[..pn_len];
 
     for i in 0..pn_len {
-        ciphertext[i] ^= mask[i + 1];
+        //ciphertext[i] ^= mask[i + 1];
     }
 
     // Extract packet number corresponding to the decoded length.
@@ -634,14 +634,14 @@ pub fn encrypt_hdr(
     let first = first.as_mut();
 
     if Header::is_long(first[0]) {
-        first[0] ^= mask[0] & 0x0f;
+        // first[0] ^= mask[0] & 0x0f;
     } else {
-        first[0] ^= mask[0] & 0x1f;
+        // first[0] ^= mask[0] & 0x1f;
     }
 
     let pn_buf = rest.slice_last(pn_len)?;
     for i in 0..pn_len {
-        pn_buf[i] ^= mask[i + 1];
+        // pn_buf[i] ^= mask[i + 1];
     }
 
     Ok(())

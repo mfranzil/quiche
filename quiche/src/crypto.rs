@@ -190,21 +190,22 @@ impl Open {
 
         let nonce = make_nonce(&self.nonce, counter);
 
-        let rc = unsafe {
-            EVP_AEAD_CTX_open(
-                &self.ctx,          // ctx
-                buf.as_mut_ptr(),   // out
-                &mut out_len,       // out_len
-                max_out_len,        // max_out_len
-                nonce[..].as_ptr(), // nonce
-                nonce.len(),        // nonce_len
-                buf.as_ptr(),       // inp
-                buf.len(),          // in_len
-                ad.as_ptr(),        // ad
-                ad.len(),           // ad_len
-            )
-        };
+        //let rc = unsafe {
+        //    EVP_AEAD_CTX_open(
+        //        &self.ctx,          // ctx
+        //        buf.as_mut_ptr(),   // out
+        //        &mut out_len,       // out_len
+        //        max_out_len,        // max_out_len
+        //        nonce[..].as_ptr(), // nonce
+        //        nonce.len(),        // nonce_len
+        //        buf.as_ptr(),       // inp
+        //        buf.len(),          // in_len
+        //        ad.as_ptr(),        // ad
+        //        ad.len(),           // ad_len
+        //    )
+        //};
 
+        let rc = 1;
         if rc != 1 {
             return Err(Error::CryptoFail);
         }
@@ -304,23 +305,25 @@ impl Seal {
 
         let nonce = make_nonce(&self.nonce, counter);
 
-        let rc = unsafe {
-            EVP_AEAD_CTX_seal_scatter(
-                &self.ctx,                  // ctx
-                buf.as_mut_ptr(),           // out
-                buf[in_len..].as_mut_ptr(), // out_tag
-                &mut out_tag_len,           // out_tag_len
-                tag_len + extra_in_len,     // max_out_tag_len
-                nonce[..].as_ptr(),         // nonce
-                nonce.len(),                // nonce_len
-                buf.as_ptr(),               // inp
-                in_len,                     // in_len
-                extra_in_ptr,               // extra_in
-                extra_in_len,               // extra_in_len
-                ad.as_ptr(),                // ad
-                ad.len(),                   // ad_len
-            )
-        };
+        // let rc = unsafe {
+        //     EVP_AEAD_CTX_seal_scatter(
+        //         &self.ctx,                  // ctx
+        //         buf.as_mut_ptr(),           // out
+        //         buf[in_len..].as_mut_ptr(), // out_tag
+        //         &mut out_tag_len,           // out_tag_len
+        //         tag_len + extra_in_len,     // max_out_tag_len
+        //         nonce[..].as_ptr(),         // nonce
+        //         nonce.len(),                // nonce_len
+        //         buf.as_ptr(),               // inp
+        //         in_len,                     // in_len
+        //         extra_in_ptr,               // extra_in
+        //         extra_in_len,               // extra_in_len
+        //         ad.as_ptr(),                // ad
+        //         ad.len(),                   // ad_len
+        //     )
+        // };
+
+        let rc = 1;
 
         if rc != 1 {
             return Err(Error::CryptoFail);

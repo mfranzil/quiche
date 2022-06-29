@@ -1771,7 +1771,7 @@ impl Connection {
         // Derive initial secrets for the client. We can do this here because
         // we already generated the random destination connection ID.
         if !is_server {
-            let mut dcid = [0; 16];
+            let mut dcid = [0; 20];
             rand::rand_bytes(&mut dcid[..]);
 
             let (aead_open, aead_seal) = crypto::derive_initial_key_material(
@@ -7476,12 +7476,12 @@ pub mod testing {
         }
 
         pub fn with_config(config: &mut Config) -> Result<Pipe> {
-            let mut client_scid = [0; 16];
+            let mut client_scid = [0; 20];
             rand::rand_bytes(&mut client_scid[..]);
             let client_scid = ConnectionId::from_ref(&client_scid);
             let client_addr = Pipe::client_addr();
 
-            let mut server_scid = [0; 16];
+            let mut server_scid = [0; 20];
             rand::rand_bytes(&mut server_scid[..]);
             let server_scid = ConnectionId::from_ref(&server_scid);
             let server_addr = Pipe::server_addr();
@@ -7536,12 +7536,12 @@ pub mod testing {
         }
 
         pub fn with_client_config(client_config: &mut Config) -> Result<Pipe> {
-            let mut client_scid = [0; 16];
+            let mut client_scid = [0; 20];
             rand::rand_bytes(&mut client_scid[..]);
             let client_scid = ConnectionId::from_ref(&client_scid);
             let client_addr = Pipe::client_addr();
 
-            let mut server_scid = [0; 16];
+            let mut server_scid = [0; 20];
             rand::rand_bytes(&mut server_scid[..]);
             let server_scid = ConnectionId::from_ref(&server_scid);
             let server_addr = Pipe::server_addr();
@@ -7576,12 +7576,12 @@ pub mod testing {
         }
 
         pub fn with_server_config(server_config: &mut Config) -> Result<Pipe> {
-            let mut client_scid = [0; 16];
+            let mut client_scid = [0; 20];
             rand::rand_bytes(&mut client_scid[..]);
             let client_scid = ConnectionId::from_ref(&client_scid);
             let client_addr = Pipe::client_addr();
 
-            let mut server_scid = [0; 16];
+            let mut server_scid = [0; 20];
             rand::rand_bytes(&mut server_scid[..]);
             let server_scid = ConnectionId::from_ref(&server_scid);
             let server_addr = Pipe::server_addr();
@@ -12832,12 +12832,12 @@ mod tests {
 
     #[test]
     fn update_max_datagram_size() {
-        let mut client_scid = [0; 16];
+        let mut client_scid = [0; 20];
         rand::rand_bytes(&mut client_scid[..]);
         let client_scid = ConnectionId::from_ref(&client_scid);
         let client_addr = "127.0.0.1:1234".parse().unwrap();
 
-        let mut server_scid = [0; 16];
+        let mut server_scid = [0; 20];
         rand::rand_bytes(&mut server_scid[..]);
         let server_scid = ConnectionId::from_ref(&server_scid);
         let server_addr = "127.0.0.1:4321".parse().unwrap();
@@ -13024,12 +13024,12 @@ mod tests {
             config.set_ack_delay_exponent(8);
         }
 
-        let mut client_scid = [0; 16];
+        let mut client_scid = [0; 20];
         rand::rand_bytes(&mut client_scid[..]);
         let client_scid = ConnectionId::from_ref(&client_scid);
         let client_addr = "127.0.0.1:1234".parse().unwrap();
 
-        let mut server_scid = [0; 16];
+        let mut server_scid = [0; 20];
         rand::rand_bytes(&mut server_scid[..]);
         let server_scid = ConnectionId::from_ref(&server_scid);
         let server_addr = "127.0.0.1:4321".parse().unwrap();

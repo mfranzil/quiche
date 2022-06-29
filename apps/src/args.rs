@@ -191,6 +191,7 @@ impl Default for CommonArgs {
             dgram_count: 0,
             dgram_data: "quack".to_string(),
             max_active_cids: 2,
+            // max_active_cids: 1,
             enable_active_migration: false,
         }
     }
@@ -340,6 +341,7 @@ impl Default for ClientArgs {
     fn default() -> Self {
         ClientArgs {
             version: 0xbabababa,
+            // version: 0x00000001,
             dump_response_path: None,
             dump_json: None,
             urls: vec![],
