@@ -1312,6 +1312,9 @@ pub struct Connection {
     /// Whether the connection should prevent from reusing destination
     /// Connection IDs when the peer migrates.
     disable_dcid_reuse: bool,
+
+    /// Spin bit status for the connection.
+    spin_bit: bool
 }
 
 /// Creates a new server-side connection.
@@ -1746,6 +1749,8 @@ impl Connection {
             emit_dgram: true,
 
             disable_dcid_reuse: config.disable_dcid_reuse,
+
+            spin_bit: false,
         };
 
         if let Some(odcid) = odcid {
@@ -2646,6 +2651,15 @@ impl Connection {
             p.active_dcid_seq = Some(dcid_seq);
         }
 
+        if self.pkt_num_spaces[epoch].largest_rx_pkt_num < pn {
+            // Update spin bit status only if client and the packet number was higher.
+            if hdr.ty == packet::Type::Short && ! self.is_server {
+                self.spin_bit = ! self.spin_bit;
+                info!("Update spin bit status {} < {}, now {} ",
+                    self.pkt_num_spaces[epoch].largest_rx_pkt_num, pn, self.spin_bit);
+            }
+        }
+
         // We only record the time of arrival of the largest packet number
         // that still needs to be acked, to be used for ACK delay calculation.
         if self.pkt_num_spaces[epoch].recv_pkt_need_ack.last() < Some(pn) {
@@ -3172,6 +3186,7 @@ impl Connection {
 
             versions: None,
             key_phase: false,
+            spin_bit: self.spin_bit,
         };
 
         hdr.to_bytes(&mut b)?;
@@ -7787,6 +7802,7 @@ pub mod testing {
             ),
             pkt_num: 0,
             pkt_num_len: pn_len,
+            spin_bit: conn.spin_bit,
             token: conn.token.clone(),
             versions: None,
             key_phase: false,
@@ -10442,6 +10458,7 @@ mod tests {
             token: pipe.client.token.clone(),
             versions: None,
             key_phase: false,
+            spin_bit: false,
         };
 
         hdr.to_bytes(&mut b).unwrap();

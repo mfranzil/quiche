@@ -38,6 +38,7 @@ use crate::stream;
 
 const FORM_BIT: u8 = 0x80;
 const FIXED_BIT: u8 = 0x40;
+const SPIN_BIT: u8 = 0x20;
 const KEY_PHASE_BIT: u8 = 0x04;
 
 const TYPE_MASK: u8 = 0x30;
@@ -271,6 +272,9 @@ pub struct Header<'a> {
     /// The key phase bit of the packet. It's only meaningful after the header
     /// protection is removed.
     pub(crate) key_phase: bool,
+
+    /// The spin bit in short headers.
+    pub spin_bit: bool,
 }
 
 impl<'a> Header<'a> {
@@ -306,6 +310,7 @@ impl<'a> Header<'a> {
 
         if !Header::is_long(first) {
             // Decode short header.
+            let spin_bit = (first & SPIN_BIT) != 0;
             let dcid = b.get_bytes(dcid_len)?;
 
             return Ok(Header {
@@ -318,6 +323,7 @@ impl<'a> Header<'a> {
                 token: None,
                 versions: None,
                 key_phase: false,
+                spin_bit,
             });
         }
 
@@ -392,6 +398,7 @@ impl<'a> Header<'a> {
             token,
             versions,
             key_phase: false,
+            spin_bit: false,
         })
     }
 
@@ -408,6 +415,12 @@ impl<'a> Header<'a> {
 
             // Set fixed bit.
             first |= FIXED_BIT;
+
+            // Set spin bit.
+            if self.spin_bit {
+                info!("Setting spin bit on short header");
+                first |= SPIN_BIT;
+            }
 
             // Set key phase bit.
             if self.key_phase {
@@ -726,6 +739,7 @@ pub fn retry(
         token: Some(token.to_vec()),
         versions: None,
         key_phase: false,
+        spin_bit: false,
     };
 
     hdr.to_bytes(&mut b)?;
@@ -962,6 +976,7 @@ mod tests {
             token: Some(vec![0xba; 24]),
             versions: None,
             key_phase: false,
+            spin_bit: false
         };
 
         let mut d = [0; 63];
@@ -989,6 +1004,7 @@ mod tests {
             token: Some(vec![0x05, 0x06, 0x07, 0x08]),
             versions: None,
             key_phase: false,
+            spin_bit: false
         };
 
         let mut d = [0; 50];
@@ -1016,6 +1032,7 @@ mod tests {
             token: Some(vec![0x05, 0x06, 0x07, 0x08]),
             versions: None,
             key_phase: false,
+            spin_bit: false
         };
 
         let mut d = [0; 50];
@@ -1044,6 +1061,7 @@ mod tests {
             token: Some(vec![0x05, 0x06, 0x07, 0x08]),
             versions: None,
             key_phase: false,
+            spin_bit: false
         };
 
         let mut d = [0; 50];
@@ -1072,6 +1090,7 @@ mod tests {
             token: Some(vec![0x05, 0x06, 0x07, 0x08]),
             versions: None,
             key_phase: false,
+            spin_bit: false
         };
 
         let mut d = [0; 50];
@@ -1096,6 +1115,7 @@ mod tests {
             token: None,
             versions: None,
             key_phase: false,
+            spin_bit: false
         };
 
         let mut d = [0; 50];
@@ -1120,6 +1140,7 @@ mod tests {
             token: None,
             versions: None,
             key_phase: false,
+            spin_bit: false
         };
 
         let mut d = [0; 50];
@@ -2798,6 +2819,7 @@ mod tests {
             token: None,
             versions: None,
             key_phase: false,
+            spin_bit: false
         };
 
         hdr.to_bytes(&mut b).unwrap();
@@ -2830,6 +2852,7 @@ mod tests {
             token: None,
             versions: None,
             key_phase: false,
+            spin_bit: false
         };
 
         hdr.to_bytes(&mut b).unwrap();
