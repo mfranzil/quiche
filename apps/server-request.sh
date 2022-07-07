@@ -1,0 +1,1 @@
+RUST_LOG=trace cargo run --bin quiche-server -- --cert /home/vagrant/quiche/apps/src/bin/cert.crt --key /home/vagrant/quiche/apps/src/bin/cert.key --listen 0.0.0.0:4433 --root /home/vagrant/quiche/apps/src/bin/root --disable-hystart --no-grease --dgram-proto none --dgram-count 0
