@@ -307,7 +307,10 @@ impl Frame {
 
             0x30 | 0x31 => parse_datagram_frame(frame_type, b)?,
 
-            _ => return Err(Error::InvalidFrame),
+            _ => {
+                trace!("unexpected frame type: {}", frame_type);
+                return Err(Error::InvalidFrame)
+            }
         };
 
         let allowed = match (pkt, &frame) {

@@ -2279,6 +2279,8 @@ impl Connection {
             return Err(Error::Done);
         }
 
+        trace!("b cap before payload extraction {}", b.cap());
+
         // Long header packets have an explicit payload length, but short
         // packets don't so just use the remaining capacity in the buffer.
         let payload_len = if hdr.ty == packet::Type::Short {
@@ -2367,6 +2369,8 @@ impl Connection {
 
         let aead_tag_len = aead.alg().tag_len();
 
+        trace!("extracted aed tag with len {}, current b cap {}", aead_tag_len, b.cap());
+
         packet::decrypt_hdr(&mut b, &mut hdr, aead).map_err(|e| {
             drop_pkt_on_err(e, self.recv_count, self.is_server, &self.trace_id)
         })?;
@@ -2401,6 +2405,8 @@ impl Connection {
         .map_err(|e| {
             drop_pkt_on_err(e, self.recv_count, self.is_server, &self.trace_id)
         })?;
+
+        trace!("total payload len {}", payload.len());
 
         if self.pkt_num_spaces[epoch].recv_pkt_num.contains(pn) {
             trace!("{} ignored duplicate packet {}", self.trace_id, pn);
@@ -2471,6 +2477,7 @@ impl Connection {
         // Process packet payload.
         while payload.cap() > 0 {
             let frame = frame::Frame::from_bytes(&mut payload, hdr.ty)?;
+            error!("<> <> {} rx frame {:?}, remaining cap {}", self.trace_id, frame, payload.cap());
 
             qlog_with_type!(QLOG_PACKET_RX, self.qlog, _q, {
                 qlog_frames.push(frame.to_qlog());
@@ -2489,6 +2496,7 @@ impl Connection {
                 frame_processing_err = Some(e);
                 break;
             }
+
         }
 
         qlog_with_type!(QLOG_PACKET_RX, self.qlog, q, {
@@ -2655,8 +2663,8 @@ impl Connection {
             // Update spin bit status only if client and the packet number was higher.
             if hdr.ty == packet::Type::Short && ! self.is_server {
                 self.spin_bit = ! self.spin_bit;
-                info!("Update spin bit status {} < {}, now {} ",
-                    self.pkt_num_spaces[epoch].largest_rx_pkt_num, pn, self.spin_bit);
+                trace!("update spin bit status to {} due to pkts {} < {}",
+                self.spin_bit, self.pkt_num_spaces[epoch].largest_rx_pkt_num, pn);
             }
         }
 

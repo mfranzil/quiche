@@ -418,7 +418,7 @@ impl<'a> Header<'a> {
 
             // Set spin bit.
             if self.spin_bit {
-                info!("Setting spin bit on short header");
+                trace!("setting spin bit on pkt");
                 first |= SPIN_BIT;
             }
 
