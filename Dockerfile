@@ -17,7 +17,7 @@ RUN cargo build --manifest-path apps/Cargo.toml
 ##
 FROM debian:latest as quiche-base
 
-RUN apt-get update && apt-get install -y ca-certificates && \
+RUN apt-get update && apt-get install -y ca-certificates iputils-ping iproute2 && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=build \
@@ -38,11 +38,7 @@ FROM martenseemann/quic-network-simulator-endpoint:latest as quiche-qns
 WORKDIR /quiche
 
 COPY --from=build \
-     /build/apps/target/debug/quiche-client \
-     /build/apps/target/debug/quiche-server \
-     /build/apps/run_endpoint.sh \
+     /build/apps \
      ./
 
 ENV RUST_LOG=trace
-
-ENTRYPOINT [ "./run_endpoint.sh" ]
