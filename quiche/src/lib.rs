@@ -2369,8 +2369,6 @@ impl Connection {
 
         let aead_tag_len = aead.alg().tag_len();
 
-        trace!("extracted aed tag with len {}, current b cap {}", aead_tag_len, b.cap());
-
         packet::decrypt_hdr(&mut b, &mut hdr, aead).map_err(|e| {
             drop_pkt_on_err(e, self.recv_count, self.is_server, &self.trace_id)
         })?;
@@ -2406,8 +2404,6 @@ impl Connection {
             drop_pkt_on_err(e, self.recv_count, self.is_server, &self.trace_id)
         })?;
 
-        trace!("total payload len {}", payload.len());
-
         if self.pkt_num_spaces[epoch].recv_pkt_num.contains(pn) {
             trace!("{} ignored duplicate packet {}", self.trace_id, pn);
             return Err(Error::Done);
@@ -2417,6 +2413,8 @@ impl Connection {
         if payload.cap() == 0 {
             return Err(Error::InvalidPacket);
         }
+
+        trace!("extracted aed tag with len {}, payload cap {}", aead_tag_len, payload.cap());
 
         // Now that we decrypted the packet, let's see if we can map it to an
         // existing path.
@@ -2475,9 +2473,9 @@ impl Connection {
         let mut probing = true;
 
         // Process packet payload.
+        trace!("parsing frm initial cap {}", payload.cap());
         while payload.cap() > 0 {
             let frame = frame::Frame::from_bytes(&mut payload, hdr.ty)?;
-            error!("<> <> {} rx frame {:?}, remaining cap {}", self.trace_id, frame, payload.cap());
 
             qlog_with_type!(QLOG_PACKET_RX, self.qlog, _q, {
                 qlog_frames.push(frame.to_qlog());
@@ -2496,7 +2494,7 @@ impl Connection {
                 frame_processing_err = Some(e);
                 break;
             }
-
+            trace!("parsing frm remaining cap {}", payload.cap());
         }
 
         qlog_with_type!(QLOG_PACKET_RX, self.qlog, q, {
